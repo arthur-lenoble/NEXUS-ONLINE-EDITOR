@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPLA editor</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        textarea { width: 100%; height: 200px; }
+        #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Éditeur OPLA</h1>
+    <textarea id="code" placeholder="Entrez votre code OPLA ici..."></textarea>
+    <br>
+    <button onclick="executeCode()">Exécuter</button>
+    <div id="output"></div>
+
+    <script>
+        class OPLACompiler {
+            constructor() {
+                this.variables = {};
+                this.functions = {};
+            }
+
+            async execute(command) {
+                try {
+                    if (command.startsWith("CONSOLE.AFFIRM")) {
+                        return this.consoleAffirm(command);
+                    } else if (command.startsWith("CONSOLE.SUM")) {
+                        return this.consoleSum(command);
+                    } else if (command.startsWith("CONSOLE.INPUT")) {
+                        return this.consoleInput(command);
+                    } else if (command.startsWith("MATH.ADD")) {
+                        return this.mathAdd(command);
+                    } else if (command.startsWith("CONSOLE.CONDITION")) {
+                        return this.consoleCondition(command);
+                    } else if (command.startsWith("LOOP")) {
+                        return this.loop(command);
+                    } else if (command.startsWith("DEFINE FUNCTION")) {
+                        return this.defineFunction(command);
+                    } else if (command.startsWith("CALL FUNCTION")) {
+                        return this.callFunction(command);
+                    } else if (command.startsWith("OPLA.EXECUTION")) {
+                        return await this.oplaExecution(command);
+                    } else if (command.trim().startsWith("#")) {
+                        return ""; // Ignorer les commentaires
+                    } else {
+                        throw new Error(`Commande inconnue: ${command}`);
+                    }
+                } catch (error) {
+                    return `Erreur: ${error.message}`;
+                }
+            }
+
+            consoleAffirm(command) {
+                const match = command.match(/CONSOLE\.AFFIRM\s*"(.*)"/);
+                if (match) {
+                    return match[1];
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour CONSOLE.AFFIRM");
+                }
+            }
+
+            consoleSum(command) {
+                const match = command.match(/CONSOLE\.SUM\((.*?)\)\s*TO DEFINE\s*(\w+)/);
+                if (match) {
+                    const [num1, num2] = match[1].split(",").map(Number);
+                    const variable = match[2].trim();
+                    this.variables[variable] = num1 + num2;
+                    return `${variable} = ${num1 + num2}`;
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour CONSOLE.SUM");
+                }
+            }
+
+            consoleInput(command) {
+                const match = command.match(/CONSOLE\.INPUT\s*"(.*?)"\s*TO DEFINE\s*(\w+)/);
+                if (match) {
+                    const message = match[1];
+                    const variable = match[2].trim();
+                    const userInput = prompt(message);
+                    this.variables[variable] = userInput;
+                    return `${variable} = ${userInput}`;
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour CONSOLE.INPUT");
+                }
+            }
+
+            mathAdd(command) {
+                const match = command.match(/MATH\.ADD\((.*?)\)\s*TO DEFINE\s*(\w+)/);
+                if (match) {
+                    const [num1, num2] = match[1].split(",").map(Number);
+                    const variable = match[2].trim();
+                    this.variables[variable] = num1 + num2;
+                    return `${variable} = ${num1 + num2}`;
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour MATH.ADD");
+                }
+            }
+
+            consoleCondition(command) {
+                const match = command.match(/CONSOLE\.CONDITION\((.*?),\s*"(.*?)","(.*?)"\)/);
+                if (match) {
+                    const condition = match[1];
+                    const trueMessage = match[2];
+                    const falseMessage = match[3];
+                    if (eval(condition)) {
+                        return trueMessage;
+                    } else {
+                        return falseMessage;
+                    }
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour CONSOLE.CONDITION");
+                }
+            }
+
+            loop(command) {
+                const match = command.match(/LOOP\s*\((.*?)\)\s*FROM\s*(.*?)\s*DO\s*(.*)/);
+                if (match) {
+                    const loopPart = match[1];
+                    const commands = match[3].trim();
+                    const [start, end] = loopPart.split(",").map(Number);
+                    let output = [];
+                    for (let i = start; i < end; i++) {
+                        this.variables['i'] = i;
+                        output.push(this.execute(commands));
+                    }
+                    return output.join("\n");
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour LOOP");
+                }
+            }
+
+            defineFunction(command) {
+                const match = command.match(/DEFINE FUNCTION\s*"(.*?)"\s*AS\s*"(.*?)"/);
+                if (match) {
+                    const functionName = match[1];
+                    const functionBody = match[2];
+                    this.functions[functionName] = functionBody;
+                    return `Fonction ${functionName} définie`;
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour DEFINE FUNCTION");
+                }
+            }
+
+            callFunction(command) {
+                const match = command.match(/CALL FUNCTION\s*"(.*?)"/);
+                if (match) {
+                    const functionName = match[1];
+                    if (this.functions[functionName]) {
+                        return this.execute(this.functions[functionName]);
+                    } else {
+                        throw new Error(`Fonction inconnue: ${functionName}`);
+                    }
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour CALL FUNCTION");
+                }
+            }
+
+            async oplaExecution(command) {
+                const match = command.match(/OPLA\.EXECUTION\("(.*?)",\s*"(.*?)"\)/);
+                if (match) {
+                    const language = match[1];
+                    const code = match[2];
+                    let apiUrl;
+
+                    if (language === "python") {
+                        apiUrl = `https://glot.io/api/run/python/latest`;
+                    } else if (language === "java") {
+                        apiUrl = `https://glot.io/api/run/java/latest`;
+                    } else if (language === "c") {
+                        apiUrl = `https://glot.io/api/run/c/latest`;
+                    } else {
+                        throw new Error(`Langage non supporté: ${language}`);
+                    }
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ files: [{ name: "main.py", content: code }] })
+                    });
+                    const result = await response.json();
+                    return result.stdout;
+                } else {
+                    throw new SyntaxError("Syntaxe incorrecte pour OPLA.EXECUTION");
+                }
+            }
+        }
+
+        const compiler = new OPLACompiler();
+
+        async function executeCode() {
+            const code = document.getElementById('code').value;
+            const output = document.getElementById('output');
+            const lines = code.split('\n');
+            let result = "";
+            for (const line of lines) {
+                result += await compiler.execute(line) + "\n";
+            }
+            output.innerText = result;
+        }
+    </script>
+</body>
+</html>
